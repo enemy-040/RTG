@@ -7,11 +7,14 @@ from tqdm import tqdm
 market_data = pd.read_csv('data/market_data2.csv')
 
 
-
-initBook = order_book.OrderBook(
+Book0 = order_book.OrderBook(
         instrument=0,
         maker_fee=0.01,
         taker_fee=0.02)
+Book1 = order_book.OrderBook(
+    instrument=1,
+    maker_fee=0.01,
+    taker_fee=0.02)
 
 timeArr = market_data['Time'].values
 operationsArr = market_data['Operation'].values
@@ -22,39 +25,58 @@ sideArr = market_data['Side'].values
 priceArr = market_data['Price'].values
 volumeArr = market_data['Volume'].values
 
+
 for op in tqdm(range(len(market_data))):
+
     if operationsArr[op] == 'Insert':
-       tempOrder = order_book.Order(
-               client_order_id = idsArr[op],
-               instrument = instrumentArr[op],
-               lifespan = lifespanArr[op],
-               side = sideArr[op],
-               price = priceArr[op],
-               volume= volumeArr[op]
-               )
-       initBook.insert(now=timeArr[op], order=tempOrder)
+
+        tempOrder = order_book.Order(
+            client_order_id=idsArr[op],
+            instrument=instrumentArr[op],
+            lifespan=lifespanArr[op],
+            side=sideArr[op],
+            price=priceArr[op],
+            volume=volumeArr[op]
+        )
+        if instrumentArr[op] == 0:
+            Book0.insert(now=timeArr[op], order=tempOrder)
+        elif instrumentArr[op] == 1:
+            Book1.insert(now=timeArr[op], order=tempOrder)
 
     elif operationsArr[op] == 'Amend':
-        initBook.amend(
+        if instrumentArr[op] == 0:
+            Book0.amend(
+                now=timeArr[op],
+                order=idsArr[op],
+                new_volume=volumeArr[op])
+        elif instrumentArr[op] == 1:
+            Book1.amend(
                 now=timeArr[op],
                 order=idsArr[op],
                 new_volume=volumeArr[op])
 
-    elif market_data['Operation'][op] == 'Cancel':
-        finding = market_data[market_data['OrderId'] == market_data['OrderId'][op]]
+    elif operationsArr[op] == 'Cancel':
+        orderFound = np.where(idsArr == idsArr[op])[0][0]
 
         toCancel = order_book.Order(
-               client_order_id = market_data['OrderId'][op],
-               instrument = market_data['Instrument'][op],
-               lifespan = market_data['Lifespan'][op],
-               side = market_data['Side'][op],
-               price = market_data['Price'][op],
-               volume= market_data['Volume'][op]
-               )
-        initBook.cancel(
-                now = timeArr[op],
-                order = toCancel
-                )
+            client_order_id=idsArr[orderFound],
+            instrument=instrumentArr[orderFound],
+            lifespan=lifespanArr[orderFound],
+            side=sideArr[orderFound],
+            price=priceArr[orderFound],
+            volume=volumeArr[orderFound]
+        )
+        if instrumentArr[orderFound] == 0:
+            Book0.cancel(
+                now=timeArr[op],
+                order=toCancel
+            )
+        elif instrumentArr[orderFound] == 1:
+            Book1.cancel(
+                now=timeArr[op],
+                order=toCancel
+            )
+
 
 
 
