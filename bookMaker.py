@@ -29,6 +29,7 @@ volumeArr = market_data['Volume'].values
 for op in tqdm(range(len(market_data))):
 
     if operationsArr[op] == 'Insert':
+        # print("Insert")
 
         tempOrder = order_book.Order(
             client_order_id=idsArr[op],
@@ -44,18 +45,22 @@ for op in tqdm(range(len(market_data))):
             Book1.insert(now=timeArr[op], order=tempOrder)
 
     elif operationsArr[op] == 'Amend':
+        # print("Amend")
         if instrumentArr[op] == 0:
             Book0.amend(
-                now=timeArr[op],
-                order=idsArr[op],
-                new_volume=volumeArr[op])
+                    now=timeArr[op],
+                    order=idsArr[op],
+                    new_volume=volumeArr[op])
+
         elif instrumentArr[op] == 1:
             Book1.amend(
                 now=timeArr[op],
                 order=idsArr[op],
                 new_volume=volumeArr[op])
 
+
     elif operationsArr[op] == 'Cancel':
+
         orderFound = np.where(idsArr == idsArr[op])[0][0]
 
         toCancel = order_book.Order(
@@ -66,12 +71,12 @@ for op in tqdm(range(len(market_data))):
             price=priceArr[orderFound],
             volume=volumeArr[orderFound]
         )
-        if instrumentArr[orderFound] == 0:
+        if instrumentArr[op] == 0:
             Book0.cancel(
                 now=timeArr[op],
                 order=toCancel
             )
-        elif instrumentArr[orderFound] == 1:
+        elif instrumentArr[op] == 1:
             Book1.cancel(
                 now=timeArr[op],
                 order=toCancel

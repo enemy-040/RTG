@@ -132,6 +132,8 @@ class OrderBook(object):
             if order.listener:
                 order.listener.on_order_cancelled(now, order, remaining)
 
+
+
     def insert(self, now: float, order: Order) -> None:
         """Insert a new order into this order book."""
         if order.side == Side.SELL and self.__bid_prices and order.price <= self.__bid_prices[-1]:
