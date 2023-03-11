@@ -82,7 +82,7 @@ class AutoTrader(BaseAutoTrader):
                          sequence_number)
         if instrument == Instrument.FUTURE:
             mn_spread = np.mean(ask_prices)-np.mean(bid_prices)
-            askVolPriceProd= []
+            askVolPriceProd = []
             for it in range(ask_volumes):
                 askVolPriceProd.extend(
                         [ask_prices[it] for j in range(ask_volumes[it])]
@@ -100,7 +100,9 @@ class AutoTrader(BaseAutoTrader):
             bidVolPriVar = np.var(bidVolPriceProd)
             new_bid_price = np.mean(bid_prices) + mn_spread/bidVolPriVar if bid_prices[0] != 0 else 0
 
-
+            if new_ask_price < new_bid_price:
+                new_bid_price = max(bid_prices)
+                new_ask_price = min(ask_prices)
 
 
             if self.bid_id != 0 and new_bid_price not in (self.bid_price, 0):
