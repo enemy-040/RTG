@@ -85,16 +85,21 @@
 #
 #
 #
+#%%
 import pandas as pd
 from ready_trader_go import order_book
 from tqdm import tqdm
+import numpy as np
 
+#%%
 
 market_data = pd.read_csv('data/market_data2.csv')
 
+orderBookImage = {}
+
 order_books = {
-    0: order_book.OrderBook(instrument=0, maker_fee=0.01, taker_fee=0.02),
-    1: order_book.OrderBook(instrument=1, maker_fee=0.01, taker_fee=0.02)
+    0: order_book.OrderBook(instrument=0, maker_fee=-0.01, taker_fee=0.02),
+    1: order_book.OrderBook(instrument=1, maker_fee=-0.01, taker_fee=0.02)
 }
 
 orders = {}
@@ -124,3 +129,11 @@ for _, row in tqdm(market_data.iterrows(), total=market_data.shape[0]):
         order = orders[row['OrderId']]
         order_books[row['Instrument']].cancel(now=row['Time'], order=order)
         del orders[row['OrderId']]
+    # if row["Time"] not in orderBookImage.keys():
+    #     orderBookImage[str(row["Time"])] = np.empty(2)
+    #     orderBookImage[str(row["Time"])][row["Instrument"]] = or
+    # else:
+    #     orderBookImage[str(row["Time"])][row["Instrument"]] = "2"
+#%%
+
+print(order_books[1].get_state())
