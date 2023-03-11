@@ -47,6 +47,7 @@ class AutoTrader(BaseAutoTrader):
         self.bids = set()
         self.asks = set()
         self.ask_id = self.ask_price = self.bid_id = self.bid_price = self.position = 0
+        self.book = []
 
     def on_error_message(self, client_order_id: int, error_message: bytes) -> None:
         """Called when the exchange detects an error.
@@ -67,11 +68,16 @@ class AutoTrader(BaseAutoTrader):
         """
         self.logger.info("received hedge filled for order %d with average price %d and volume %d", client_order_id,
                          price, volume)
+        
+    def store_book(self, ask_prices: List[int], ask_volumes: List[int], bid_prices: List[int], bid_volumes: List[int]):
+        "Whenever the order book is updated it stores the new version of the order book"
+        self.book.append([ask_prices, ask_volumes, bid_prices, bid_volumes])
+
+    
 
     def on_order_book_update_message(self, instrument: int, sequence_number: int, ask_prices: List[int],
                                      ask_volumes: List[int], bid_prices: List[int], bid_volumes: List[int]) -> None:
         """Called periodically to report the status of an order book.
-
         The sequence number can be used to detect missed or out-of-order
         messages. The five best available ask (i.e. sell) and bid (i.e. buy)
         prices are reported along with the volume available at each of those
@@ -79,6 +85,7 @@ class AutoTrader(BaseAutoTrader):
         """
         self.logger.info("received order book for instrument %d with sequence number %d", instrument,
                          sequence_number)
+        
         if instrument == Instrument.FUTURE:
             price_adjustment = - (self.position // LOT_SIZE) * TICK_SIZE_IN_CENTS
             new_bid_price = bid_prices[0] + price_adjustment if bid_prices[0] != 0 else 0
@@ -102,6 +109,7 @@ class AutoTrader(BaseAutoTrader):
                 self.ask_price = new_ask_price
                 self.send_insert_order(self.ask_id, Side.SELL, new_ask_price, LOT_SIZE, Lifespan.GOOD_FOR_DAY)
                 self.asks.add(self.ask_id)
+
 
     def on_order_filled_message(self, client_order_id: int, price: int, volume: int) -> None:
         """Called when one of your orders is filled, partially or fully.
