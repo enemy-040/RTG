@@ -21,6 +21,7 @@ import enum
 import logging
 import queue
 import threading
+import json
 
 from typing import Callable, Dict, List, Optional, TextIO
 
@@ -58,6 +59,7 @@ class MarketEvent(object):
         self.lifespan: Optional[Lifespan] = lifespan
 
 
+
 class MarketEventsReader(IOrderListener):
     """A processor of market events read from a file."""
 
@@ -75,6 +77,7 @@ class MarketEventsReader(IOrderListener):
         self.match_events: MatchEvents = match_events
         self.queue: queue.Queue = queue.Queue(MARKET_EVENT_QUEUE_SIZE)
         self.reader_task: Optional[threading.Thread] = None
+        self.books  = []
 
         # Prime the event pump with a no-op event
         self.next_event: Optional[MarketEvent] = MarketEvent(0.0, Instrument.FUTURE, MarketEventOperation.CANCEL, 0,
@@ -160,15 +163,39 @@ class MarketEventsReader(IOrderListener):
         with market_data:
             csv_reader = csv.reader(market_data)
             next(csv_reader)  # Skip header row
+            counter = 0
             for row in csv_reader:
-                # time, instrument, operation, order_id, side, volume, price, lifespan
-                fifo.put(MarketEvent(float(row[0]), Instrument(int(row[1])), MarketEventOperation[row[2]],
-                                     int(row[3]), Side[row[4]] if row[4] else None,
-                                     int(float(row[5])) if row[5] else 0, int(float(row[6]) * INPUT_SCALING) if row[6] else 0,
-                                     Lifespan[row[7]] if row[7] else None))
+                if (counter % 1000) == 0:    
+                    # time, instrument, operation, order_id, side, volume, price, lifespan
+                    fifo.put(MarketEvent(float(row[0]), Instrument(int(row[1])), MarketEventOperation[row[2]],
+                                        int(row[3]), Side[row[4]] if row[4] else None,
+                                        int(float(row[5])) if row[5] else 0, int(float(row[6]) * INPUT_SCALING) if row[6] else 0,
+                                        Lifespan[row[7]] if row[7] else None))
+                    self.book_saver()
+                    counter +=1 
+
+                else:
+                    fifo.put(MarketEvent(float(row[0]), Instrument(int(row[1])), MarketEventOperation[row[2]],
+                    int(row[3]), Side[row[4]] if row[4] else None,
+                    int(float(row[5])) if row[5] else 0, int(float(row[6]) * INPUT_SCALING) if row[6] else 0,
+                    Lifespan[row[7]] if row[7] else None))
+                    counter += 1
+
+
             fifo.put(None)
 
+
         self.event_loop.call_soon_threadsafe(self.on_reader_done, csv_reader.line_num - 1)
+
+    def book_saver(self):
+        self.books.append([self.etf_book.to_list()])
+        #self.books.append([str(self.etf_book)])
+
+    def books_json(self):
+        with open("books.json", "w") as fp:
+            json.dump(self.books, fp)
+
+
 
     def start(self):
         """Start the market events reader thread"""

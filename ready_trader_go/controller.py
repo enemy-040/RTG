@@ -90,6 +90,7 @@ class Controller(IController):
 
     def on_tick_timer_stopped(self, timer: Timer, now: float) -> None:
         """Shut down the match."""
+        self.__market_events_reader.books_json()
         self.__match_events_writer.finish()
         self.__score_board_writer.finish()
 

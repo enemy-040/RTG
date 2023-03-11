@@ -1,0 +1,7 @@
+Time,Team,Operation,BuyVolume,SellVolume,EtfPosition,FuturePosition,EtfPrice,FuturePrice,TotalFees,AccountBalance,ProfitOrLoss,Status
+0.0,TraderOne,Tick,0,0,0,0,,,0,0,0,OK
+1.86,TraderOne,Tick,0,0,0,0,147600,,0,0,0,OK
+3.72,TraderOne,Tick,0,0,0,0,147600,147100,0,0,0,OK
+16.86,TraderOne,Tick,10,10,0,0,146700,146900,-294,2294,2294,OK
+292.5,TraderOne,Tick,20,10,10,0,150800,151000,-441,-1489559,18441,OK
+1595.58,TraderOne,Tick,20,20,0,-10,151800,151600,-137,1544137,28137,OK

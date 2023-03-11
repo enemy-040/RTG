@@ -64,6 +64,8 @@ class Order(object):
         self.volume: int = volume
         self.listener: IOrderListener = listener
 
+
+
     def __str__(self):
         """Return a string containing a description of this order object."""
         args = (self.client_order_id, self.instrument, self.lifespan.name, self.side.name, self.price, self.volume,
@@ -92,6 +94,18 @@ class OrderBook(object):
 
         # Signals
         self.trade_occurred: List[Callable[[Any], None]] = list()
+
+    def to_list(self):
+        """Ready for json Return a string representation of this order book."""
+        ask_prices = [0] * TOP_LEVEL_COUNT
+        ask_volumes = [0] * TOP_LEVEL_COUNT
+        bid_prices = [0] * TOP_LEVEL_COUNT
+        bid_volumes = [0] * TOP_LEVEL_COUNT
+        self.top_levels(ask_prices, ask_volumes, bid_prices, bid_volumes)
+        a = {"ask_prices": [p for p in reversed(ask_prices) if p],"ask_volumes": [p for p in reversed(ask_volumes) if p],
+              "bid_prices":[p for p in bid_prices if p], "bid_volumes":[p for p in bid_volumes if p]}
+    
+        return a
 
     def __str__(self):
         """Return a string representation of this order book."""
