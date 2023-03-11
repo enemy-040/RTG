@@ -17,6 +17,7 @@
 #     <https://www.gnu.org/licenses/>.
 import asyncio
 import itertools
+import numpy as np
 
 from typing import List
 
@@ -80,9 +81,27 @@ class AutoTrader(BaseAutoTrader):
         self.logger.info("received order book for instrument %d with sequence number %d", instrument,
                          sequence_number)
         if instrument == Instrument.FUTURE:
-            price_adjustment = - (self.position // LOT_SIZE) * TICK_SIZE_IN_CENTS
-            new_bid_price = bid_prices[0] + price_adjustment if bid_prices[0] != 0 else 0
-            new_ask_price = ask_prices[0] + price_adjustment if ask_prices[0] != 0 else 0
+            mn_spread = np.mean(ask_prices)-np.mean(bid_prices)
+            askVolPriceProd= []
+            for it in range(ask_volumes):
+                askVolPriceProd.extend(
+                        [ask_prices[it] for j in range(ask_volumes[it])]
+                        )
+            askVolPriVar = np.var(askVolPriceProd)
+
+            new_ask_price = np.mean(ask_prices) - mn_spread/askVolPriVar if ask_prices[0] != 0 else 0
+
+            bidVolPriceProd = []
+
+            for jit in range(bid_volumes):
+                bidVolPriceProd.extend(
+                        [bid_prices[jit] for t in range(bid_volumes[jit])]
+                        )
+            bidVolPriVar = np.var(bidVolPriceProd)
+            new_bid_price = np.mean(bid_prices) + mn_spread/bidVolPriVar if bid_prices[0] != 0 else 0
+
+
+
 
             if self.bid_id != 0 and new_bid_price not in (self.bid_price, 0):
                 self.send_cancel_order(self.bid_id)
