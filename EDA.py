@@ -3,9 +3,8 @@ import numpy as np
 from typing import Tuple
 import matplotlib.pyplot as plt
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
-from arch import arch_model
+#from arch import arch_model
 from sklearn.model_selection import train_test_split
-import statsmodels.api as sm
 
 
 
@@ -57,8 +56,10 @@ plt.plot(ask_Std_Arr)
 plt.savefig('stdvPlt.png')
 
 plot_acf(bid_Std_Arr)
-plot_acf(ask_Std_Arr)
+plot_pacf(bid_Std_Arr)
 
+plot_acf(ask_Std_Arr)
+plot_pacf(ask_Std_Arr)
 
 ask_std_train, ask_std_test, bid_std_train, bid_std_test = train_test_split(
         ask_Std_Arr,
@@ -68,14 +69,10 @@ ask_std_train, ask_std_test, bid_std_train, bid_std_test = train_test_split(
         random_state=69
         )
 
-
 #model = arch_model(train, mean='Zero', vol='GARCH', p=6, q=#tbd take variance of variance)
 exp_var = {}
 for i in range(1, 10):
-    exp_var[i] = sm.tsa.variation.ewmvar(ask_Std_Arr, halflife=i)
+    exp_var[i] = pd.Series(ask_std_train).rolling(window=i+2).var()
 
-plt.plot(x=exp_var.keys(), y=exp_var.values())
-plt.savefig('rollingvar.png')
-
-
+print(exp_var)
 
