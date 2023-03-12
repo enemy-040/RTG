@@ -1,10 +1,14 @@
 import pandas as pd
 import numpy as np
-from typing import Dict, Tuple
+from typing import Tuple
 import matplotlib.pyplot as plt
-from statsmodels.graphics.tsaplots import plot_acf
-# from arch import arch_model
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from arch import arch_model
 from sklearn.model_selection import train_test_split
+import statsmodels.api as sm
+
+
+
 
 def getPriceVolArr(book:np.ndarray)-> Tuple[np.array, np.array]:
     askVolPriceProd = np.array([])
@@ -63,6 +67,15 @@ ask_std_train, ask_std_test, bid_std_train, bid_std_test = train_test_split(
         test_size=.2,
         random_state=69
         )
+
+
+#model = arch_model(train, mean='Zero', vol='GARCH', p=6, q=#tbd take variance of variance)
+exp_var = {}
+for i in range(1, 10):
+    exp_var[i] = sm.tsa.variation.ewmvar(ask_Std_Arr, halflife=i)
+
+plt.plot(x=exp_var.keys(), y=exp_var.values())
+plt.savefig('rollingvar.png')
 
 
 
