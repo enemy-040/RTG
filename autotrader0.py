@@ -87,15 +87,19 @@ class AutoTrader(BaseAutoTrader):
             
             price_adjustment = - (self.position // LOT_SIZE) * TICK_SIZE_IN_CENTS
 
+            # price_adjustment = 
             
 
-            new_bid_price = bid_prices[2] + price_adjustment if bid_prices[0] != 0 else 0
-            new_ask_price = ask_prices[2] + price_adjustment if ask_prices[0] != 0 else 0
+            new_bid_price = bid_prices[0] + price_adjustment if bid_prices[0] != 0 else 0
+            new_ask_price = ask_prices[0] + price_adjustment if ask_prices[0] != 0 else 0
 
 
             # if you see this, I'm so sorry.
 
 
+            # price_adjustment = - (self.position // LOT_SIZE) * TICK_SIZE_IN_CENTS
+            # new_bid_price = bid_prices[0] + price_adjustment if bid_prices[0] != 0 else 0
+            # new_ask_price = ask_prices[0] + price_adjustment if ask_prices[0] != 0 else 0
 
             if self.bid_id != 0 and new_bid_price not in (self.bid_price, 0):
                 self.send_cancel_order(self.bid_id)
