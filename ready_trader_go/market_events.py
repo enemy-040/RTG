@@ -165,7 +165,7 @@ class MarketEventsReader(IOrderListener):
             next(csv_reader)  # Skip header row
             counter = 0
             for row in csv_reader:
-                if (counter % 1000) == 0:    
+                if (counter % 1) == 0:    
                     # time, instrument, operation, order_id, side, volume, price, lifespan
                     fifo.put(MarketEvent(float(row[0]), Instrument(int(row[1])), MarketEventOperation[row[2]],
                                         int(row[3]), Side[row[4]] if row[4] else None,
