@@ -17,7 +17,8 @@
 #     <https://www.gnu.org/licenses/>.
 import asyncio
 import itertools
-
+import numpy as np
+import math
 from typing import List
 
 from ready_trader_go import BaseAutoTrader, Instrument, Lifespan, MAXIMUM_ASK, MINIMUM_BID, Side
@@ -47,6 +48,7 @@ class AutoTrader(BaseAutoTrader):
         self.bids = set()
         self.asks = set()
         self.ask_id = self.ask_price = self.bid_id = self.bid_price = self.position = 0
+        
 
     def on_error_message(self, client_order_id: int, error_message: bytes) -> None:
         """Called when the exchange detects an error.
@@ -84,17 +86,43 @@ class AutoTrader(BaseAutoTrader):
                          sequence_number)
         if instrument == Instrument.FUTURE:
             
+            ask_volumes = np.asarray(ask_volumes)
+            ask_prices = np.asarray(ask_prices)
+            bid_volumes = np.asarray(bid_volumes)
+            bid_prices = np.asarray(bid_prices)
+
+            def find_nearest(array, value):
+                array = np.asarray(array)
+                idx = (np.abs(array - value)).argmin()
+                return idx
+
             
             price_adjustment = - (self.position // LOT_SIZE) * TICK_SIZE_IN_CENTS
-
+            #print(price_adjustment)
+            ask_prices_liq = np.average(ask_prices, weights=ask_volumes/ask_volumes.sum())
+            bid_prices_liq = np.average(bid_prices, weights=bid_volumes/bid_volumes.sum())
             
+            
+             #compute variance wrt liquidity
+            mu_squared_ask = np.average(ask_prices**2, weights=ask_volumes/ask_volumes.sum())
+            mu_squared_bid = np.average(bid_prices**2, weights=bid_volumes/bid_volumes.sum())
+            std_liq_ask = np.sqrt(abs(mu_squared_ask - ask_prices_liq**2))
+            std_liq_bid = np.sqrt(abs(mu_squared_bid - bid_prices_liq**2))
 
-            new_bid_price = bid_prices[2] + price_adjustment if bid_prices[0] != 0 else 0
-            new_ask_price = ask_prices[2] + price_adjustment if ask_prices[0] != 0 else 0
+    
 
-
-            # if you see this, I'm so sorry.
-
+            ratio_liq = std_liq_ask/std_liq_bid #the closer it is to one then we have symmetric order book. so same thing applies for both
+            # otherwise we offer a smaller price for ask and bigger price for bid (note: if its too far from one its red flag)
+            #print(ratio_liq)
+            if np.round(ratio_liq) == 1.0:
+                size_spread = abs((ask_prices_liq-bid_prices_liq)/((1-ratio_liq)*ask_prices_liq - (1+ratio_liq)*bid_prices_liq))
+                #print(size_spread)
+            else:
+                size_spread = 1
+                   
+            
+            new_bid_price = bid_prices[find_nearest(bid_prices,bid_prices_liq*size_spread)]+ price_adjustment if bid_prices[0] != 0 else 0
+            new_ask_price = ask_prices[find_nearest(ask_prices, ask_prices_liq*size_spread)] + price_adjustment if ask_prices[0] != 0 else 0
 
 
             if self.bid_id != 0 and new_bid_price not in (self.bid_price, 0):
@@ -125,12 +153,16 @@ class AutoTrader(BaseAutoTrader):
         """
         self.logger.info("received order filled for order %d with price %d and volume %d", client_order_id,
                          price, volume)
+    
         if client_order_id in self.bids:
             self.position += volume
-            self.send_hedge_order(next(self.order_ids), Side.ASK, MIN_BID_NEAREST_TICK, volume)
+            dp = self.bid_price//price
+            self.send_hedge_order(next(self.order_ids), Side.ASK, MIN_BID_NEAREST_TICK, (1+dp)*volume)
+            
         elif client_order_id in self.asks:
             self.position -= volume
-            self.send_hedge_order(next(self.order_ids), Side.BID, MAX_ASK_NEAREST_TICK, volume)
+            dp = self.ask_price//price
+            self.send_hedge_order(next(self.order_ids), Side.BID, MAX_ASK_NEAREST_TICK, (1+dp)*volume)
 
     def on_order_status_message(self, client_order_id: int, fill_volume: int, remaining_volume: int,
                                 fees: int) -> None:
