@@ -48,7 +48,6 @@ class AutoTrader(BaseAutoTrader):
         self.bids = set()
         self.asks = set()
         self.ask_id = self.ask_price = self.bid_id = self.bid_price = self.position = 0
-        
 
     def on_error_message(self, client_order_id: int, error_message: bytes) -> None:
         """Called when the exchange detects an error.
@@ -84,65 +83,75 @@ class AutoTrader(BaseAutoTrader):
         """
         self.logger.info("received order book for instrument %d with sequence number %d", instrument,
                          sequence_number)
-        if instrument == Instrument.FUTURE:
-            
-            ask_volumes = np.asarray(ask_volumes)
-            ask_prices = np.asarray(ask_prices)
-            bid_volumes = np.asarray(bid_volumes)
-            bid_prices = np.asarray(bid_prices)
+       
+        ask_volumes = np.asarray(ask_volumes)
+        ask_prices = np.asarray(ask_prices)
+        bid_volumes = np.asarray(bid_volumes)
+        bid_prices = np.asarray(bid_prices)
 
-            def find_nearest(array, value):
-                array = np.asarray(array)
-                idx = (np.abs(array - value)).argmin()
-                return idx
+        def find_nearest(array, value):
+            array = np.asarray(array)
+            idx = (np.abs(array - value)).argmin()
+            return idx
 
-            
-            price_adjustment = - (self.position // LOT_SIZE) * TICK_SIZE_IN_CENTS
-            #print(price_adjustment)
-            ask_prices_liq = np.average(ask_prices, weights=ask_volumes/ask_volumes.sum())
-            bid_prices_liq = np.average(bid_prices, weights=bid_volumes/bid_volumes.sum())
-            
-            
-             #compute variance wrt liquidity
-            mu_squared_ask = np.average(ask_prices**2, weights=ask_volumes/ask_volumes.sum())
-            mu_squared_bid = np.average(bid_prices**2, weights=bid_volumes/bid_volumes.sum())
-            std_liq_ask = np.sqrt(abs(mu_squared_ask - ask_prices_liq**2))
-            std_liq_bid = np.sqrt(abs(mu_squared_bid - bid_prices_liq**2))
+        
+        price_adjustment = - (self.position // LOT_SIZE) * TICK_SIZE_IN_CENTS
+        #print(price_adjustment)
+        ask_prices_liq = np.average(ask_prices, weights=ask_volumes/ask_volumes.sum()) if ask_volumes.sum() != 0.0 else 0
+        bid_prices_liq = np.average(bid_prices, weights=bid_volumes/bid_volumes.sum()) if bid_volumes.sum() != 0.0 else 0
+        
+        
+        #compute variance wrt liquidity
+        std_liq_ask = np.sqrt(np.cov(ask_prices, aweights=ask_volumes/ask_volumes.sum()))
+        std_liq_bid = np.sqrt(np.cov(bid_prices, aweights=bid_volumes/bid_volumes.sum()))
 
-    
-
-            ratio_liq = std_liq_ask/std_liq_bid #the closer it is to one then we have symmetric order book. so same thing applies for both
-            # otherwise we offer a smaller price for ask and bigger price for bid (note: if its too far from one its red flag)
-            #print(ratio_liq)
-            if np.round(ratio_liq) == 1.0:
-                size_spread = abs((ask_prices_liq-bid_prices_liq)/((1-ratio_liq)*ask_prices_liq - (1+ratio_liq)*bid_prices_liq))
-                #print(size_spread)
-            else:
-                size_spread = 1
-                   
-            
-            new_bid_price = bid_prices[find_nearest(bid_prices,bid_prices_liq*size_spread)]+ price_adjustment if bid_prices[0] != 0 else 0
-            new_ask_price = ask_prices[find_nearest(ask_prices, ask_prices_liq*size_spread)] + price_adjustment if ask_prices[0] != 0 else 0
+        #print(f"---------------ORDER BOOK--------------")
+        #print(ask_volumes/ask_volumes.sum(), (ask_volumes/ask_volumes.sum()).sum())
 
 
-            if self.bid_id != 0 and new_bid_price not in (self.bid_price, 0):
-                self.send_cancel_order(self.bid_id)
-                self.bid_id = 0
-            if self.ask_id != 0 and new_ask_price not in (self.ask_price, 0):
-                self.send_cancel_order(self.ask_id)
-                self.ask_id = 0
 
+        ratio_liq = std_liq_ask/std_liq_bid #the closer it is to one then we have symmetric order book. so same thing applies for both
+        # otherwise we offer a smaller price for ask and bigger price for bid (note: if its too far from one its red flag)
+        #print(ratio_liq)
+        if np.round(ratio_liq) == 1.0:
+            size_spread = abs((ask_prices_liq-bid_prices_liq)/((1-ratio_liq)*ask_prices_liq - (1+ratio_liq)*bid_prices_liq))
+            #print(size_spread)
+        else:
+            size_spread = 1
+        
+        # set new prices MM
+        bid_index = find_nearest(bid_prices,bid_prices_liq*(1-size_spread))
+        ask_index = find_nearest(ask_prices, ask_prices_liq*(1-size_spread))
+        new_bid_price = bid_prices[bid_index]+ price_adjustment if bid_prices[bid_index] != 0 else 0
+        new_ask_price = ask_prices[ask_index] + price_adjustment if ask_prices[ask_index] != 0 else 0
+
+
+        if self.bid_id != 0 and new_bid_price not in (self.bid_price, 0):
+            self.send_cancel_order(self.bid_id)
+            self.bid_id = 0
+        if self.ask_id != 0 and new_ask_price not in (self.ask_price, 0):
+            self.send_cancel_order(self.ask_id)
+            self.ask_id = 0
+
+        avg_price = (ask_prices[0] + bid_prices[0])/2
+
+        movement = avg_price - bid_prices_liq > ask_prices_liq - avg_price
+        if movement:
             if self.bid_id == 0 and new_bid_price != 0 and self.position < POSITION_LIMIT:
                 self.bid_id = next(self.order_ids)
                 self.bid_price = new_bid_price
                 self.send_insert_order(self.bid_id, Side.BUY, new_bid_price, LOT_SIZE, Lifespan.GOOD_FOR_DAY)
                 self.bids.add(self.bid_id)
+                print("BUY")
 
+
+        else:
             if self.ask_id == 0 and new_ask_price != 0 and self.position > -POSITION_LIMIT:
                 self.ask_id = next(self.order_ids)
                 self.ask_price = new_ask_price
                 self.send_insert_order(self.ask_id, Side.SELL, new_ask_price, LOT_SIZE, Lifespan.GOOD_FOR_DAY)
                 self.asks.add(self.ask_id)
+                print("SELL")
 
     def on_order_filled_message(self, client_order_id: int, price: int, volume: int) -> None:
         """Called when one of your orders is filled, partially or fully.
@@ -151,6 +160,7 @@ class AutoTrader(BaseAutoTrader):
         which may be better than the order's limit price. The volume is
         the number of lots filled at that price.
         """
+
         self.logger.info("received order filled for order %d with price %d and volume %d", client_order_id,
                          price, volume)
     
